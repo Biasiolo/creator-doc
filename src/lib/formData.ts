@@ -1,25 +1,30 @@
 import type { FieldConfig } from "@/types/document";
 
 /** Utilidades para trabalhar com caminhos "a.b.c" nos dados do formulário. */
+/**
+ * Os dados do formulário são armazenados em um mapa plano cujas chaves são
+ * caminhos com pontos ("contratante.nome"). Isso mantém a configuração dos
+ * documentos simples e evita acoplamento com a estrutura interna do RHF.
+ */
 export function getValue(data: Record<string, unknown>, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, key) => {
-    if (acc && typeof acc === "object") return (acc as Record<string, unknown>)[key];
-    return undefined;
-  }, data);
+  return data[path];
 }
 
 export function setValue(data: Record<string, unknown>, path: string, value: unknown) {
-  const keys = path.split(".");
-  let cursor = data;
-  keys.forEach((key, i) => {
-    if (i === keys.length - 1) {
-      cursor[key] = value;
-      return;
-    }
-    if (typeof cursor[key] !== "object" || cursor[key] === null) cursor[key] = {};
-    cursor = cursor[key] as Record<string, unknown>;
-  });
+  data[path] = value;
   return data;
+}
+
+/** Converte "a.b" em uma chave válida para o react-hook-form. */
+export const toFormKey = (path: string) => path.replace(/\./g, "__");
+export const fromFormKey = (key: string) => key.replace(/__/g, ".");
+
+export function toFormValues(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(data).map(([k, v]) => [toFormKey(k), v]));
+}
+
+export function fromFormValues(values: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(values).map(([k, v]) => [fromFormKey(k), v]));
 }
 
 export function isFieldVisible(field: FieldConfig, data: Record<string, unknown>): boolean {

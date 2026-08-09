@@ -90,7 +90,7 @@ export function buildStepSchema(step: StepConfig, visible: (f: FieldConfig) => b
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of step.fields) {
     if (!visible(field)) continue;
-    shape[field.name] = required(baseSchema(field));
+    shape[field.name.replace(/\./g, "__")] = required(baseSchema(field));
   }
   return z.object(shape);
 }
