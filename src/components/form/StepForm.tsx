@@ -19,7 +19,12 @@ interface Props {
 /** Renderiza uma etapa do formulário com validação própria. */
 export function StepForm({ step, data, isFirst, onBack, onSubmit }: Props) {
   const methods = useForm({
-    defaultValues: toFormValues(data),
+    defaultValues: {
+      ...Object.fromEntries(
+        step.fields.map((f) => [f.name.replace(/\./g, "__"), f.type === "checkbox" ? false : ""]),
+      ),
+      ...toFormValues(data),
+    },
     mode: "onBlur",
     resolver: (values, context, options) => {
       const current = fromFormValues(values as Record<string, unknown>);
