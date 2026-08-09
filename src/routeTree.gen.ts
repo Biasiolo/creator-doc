@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DocumentosRouteImport } from './routes/documentos'
 import { Route as NovoRouteImport } from './routes/novo'
+import { Route as DocumentoIdRouteImport } from './routes/documento.$id'
 import { Route as NovoIndexRouteImport } from './routes/novo.index'
 import { Route as NovoTypeIdRouteImport } from './routes/novo.$typeId'
 
@@ -19,9 +21,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocumentosRoute = DocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NovoRoute = NovoRouteImport.update({
   id: '/novo',
   path: '/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentoIdRoute = DocumentoIdRouteImport.update({
+  id: '/documento/$id',
+  path: '/documento/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NovoIndexRoute = NovoIndexRouteImport.update({
@@ -37,33 +49,54 @@ const NovoTypeIdRoute = NovoTypeIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
   '/novo': typeof NovoRouteWithChildren
+  '/documento/$id': typeof DocumentoIdRoute
   '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo/': typeof NovoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
+  '/documento/$id': typeof DocumentoIdRoute
   '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo': typeof NovoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/documentos': typeof DocumentosRoute
   '/novo': typeof NovoRouteWithChildren
+  '/documento/$id': typeof DocumentoIdRoute
   '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo/': typeof NovoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/novo' | '/novo/$typeId' | '/novo/'
+  fullPaths:
+    | '/'
+    | '/documentos'
+    | '/novo'
+    | '/documento/$id'
+    | '/novo/$typeId'
+    | '/novo/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/novo/$typeId' | '/novo'
-  id: '__root__' | '/' | '/novo' | '/novo/$typeId' | '/novo/'
+  to: '/' | '/documentos' | '/documento/$id' | '/novo/$typeId' | '/novo'
+  id:
+    | '__root__'
+    | '/'
+    | '/documentos'
+    | '/novo'
+    | '/documento/$id'
+    | '/novo/$typeId'
+    | '/novo/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DocumentosRoute: typeof DocumentosRoute
   NovoRoute: typeof NovoRouteWithChildren
+  DocumentoIdRoute: typeof DocumentoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -75,11 +108,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documentos': {
+      id: '/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof DocumentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/novo': {
       id: '/novo'
       path: '/novo'
       fullPath: '/novo'
       preLoaderRoute: typeof NovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documento/$id': {
+      id: '/documento/$id'
+      path: '/documento/$id'
+      fullPath: '/documento/$id'
+      preLoaderRoute: typeof DocumentoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/novo/': {
@@ -113,7 +160,9 @@ const NovoRouteWithChildren = NovoRoute._addFileChildren(NovoRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DocumentosRoute: DocumentosRoute,
   NovoRoute: NovoRouteWithChildren,
+  DocumentoIdRoute: DocumentoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
