@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NovoRouteImport } from './routes/novo'
 import { Route as NovoIndexRouteImport } from './routes/novo.index'
+import { Route as NovoTypeIdRouteImport } from './routes/novo.$typeId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,28 +29,36 @@ const NovoIndexRoute = NovoIndexRouteImport.update({
   path: '/',
   getParentRoute: () => NovoRoute,
 } as any)
+const NovoTypeIdRoute = NovoTypeIdRouteImport.update({
+  id: '/$typeId',
+  path: '/$typeId',
+  getParentRoute: () => NovoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/novo': typeof NovoRouteWithChildren
+  '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo/': typeof NovoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo': typeof NovoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/novo': typeof NovoRouteWithChildren
+  '/novo/$typeId': typeof NovoTypeIdRoute
   '/novo/': typeof NovoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/novo' | '/novo/'
+  fullPaths: '/' | '/novo' | '/novo/$typeId' | '/novo/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/novo'
-  id: '__root__' | '/' | '/novo' | '/novo/'
+  to: '/' | '/novo/$typeId' | '/novo'
+  id: '__root__' | '/' | '/novo' | '/novo/$typeId' | '/novo/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -80,14 +89,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovoIndexRouteImport
       parentRoute: typeof NovoRoute
     }
+    '/novo/$typeId': {
+      id: '/novo/$typeId'
+      path: '/$typeId'
+      fullPath: '/novo/$typeId'
+      preLoaderRoute: typeof NovoTypeIdRouteImport
+      parentRoute: typeof NovoRoute
+    }
   }
 }
 
 interface NovoRouteChildren {
+  NovoTypeIdRoute: typeof NovoTypeIdRoute
   NovoIndexRoute: typeof NovoIndexRoute
 }
 
 const NovoRouteChildren: NovoRouteChildren = {
+  NovoTypeIdRoute: NovoTypeIdRoute,
   NovoIndexRoute: NovoIndexRoute,
 }
 
