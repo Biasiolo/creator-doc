@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { getDocumentType } from "@/config/documentTypes";
 import { SYSTEM_PROMPT, buildUserPrompt, sectionsToHtml } from "@/lib/promptBuilder";
@@ -8,69 +9,113 @@ const inputSchema = z.object({
   formData: z.record(z.any()),
 });
 
-const sectionSchema = z.object({ title: z.string(), content: z.string() });
-const responseSchema = z.object({ title: z.string(), sections: z.array(sectionSchema).min(1) });
+const sectionSchema = z.object({
+  title: z.string(),
+  content: z.string(),
+});
 
-function extractJson(raw: string): unknown {
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/, "")
-    .trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1) throw new Error("INVALID_JSON");
-    return JSON.parse(cleaned.slice(start, end + 1));
-  }
-}
+const responseSchema = z.object({
+  title: z.string(),
+  sections: z.array(sectionSchema).min(1),
+});
 
 /**
- * Camada isolada de IA. O provedor pode ser trocado sem impacto no frontend:
+ * Camada isolada de IA.
+ *
+ * O provedor pode ser trocado sem impacto no frontend:
  * basta manter o contrato de entrada/saída desta função.
  */
 export const generateDocumentFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data }) => {
     const config = getDocumentType(data.documentTypeId);
-    if (!config) throw new Error("Tipo de documento não encontrado.");
 
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) throw new Error("Serviço de geração indisponível no momento.");
+    if (!config) {
+      throw new Error("Tipo de documento não encontrado.");
+    }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90_000);
+    // A chave fica exclusivamente no servidor.
+    const apiKey = process.env["GEMINI_API_KEY"];
+
+    if (!apiKey) {
+      throw new Error("Serviço de geração indisponível no momento.");
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey,
+    });
 
     try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: buildUserPrompt(config, data.formData) },
-          ],
-        }),
+      const response = await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+
+        contents: buildUserPrompt(config, data.formData),
+
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+
+          // Pedimos ao Gemini para retornar JSON válido.
+          responseMimeType: "application/json",
+
+          responseSchema: {
+            type: "object",
+            properties: {
+              title: {
+                type: "string",
+              },
+
+              sections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: {
+                      type: "string",
+                    },
+                    content: {
+                      type: "string",
+                    },
+                  },
+                  required: ["title", "content"],
+                },
+              },
+            },
+            required: ["title", "sections"],
+          },
+        },
       });
 
-      if (res.status === 429) throw new Error("Muitas solicitações. Tente novamente em instantes.");
-      if (res.status === 402) throw new Error("Créditos de IA esgotados. Recarregue para continuar gerando.");
-      if (!res.ok) throw new Error("Não foi possível gerar o documento agora.");
+      const raw = response.text;
 
-      const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const raw = payload.choices?.[0]?.message?.content;
-      if (!raw) throw new Error("A IA retornou uma resposta vazia.");
+      if (!raw) {
+        throw new Error("A IA retornou uma resposta vazia.");
+      }
 
-      const parsed = responseSchema.safeParse(extractJson(raw));
+      let parsedJson: unknown;
+
+      try {
+        parsedJson = JSON.parse(raw);
+      } catch {
+        throw new Error("A IA retornou um JSON inválido.");
+      }
+
+      const parsed = responseSchema.safeParse(parsedJson);
+
       if (!parsed.success) {
         return {
           title: config.name,
-          sections: [{ title: config.name, content: raw }],
-          content: sectionsToHtml(config.name, [{ title: config.name, content: raw }]),
+          sections: [
+            {
+              title: config.name,
+              content: raw,
+            },
+          ],
+          content: sectionsToHtml(config.name, [
+            {
+              title: config.name,
+              content: raw,
+            },
+          ]),
         };
       }
 
@@ -80,11 +125,31 @@ export const generateDocumentFn = createServerFn({ method: "POST" })
         content: sectionsToHtml(parsed.data.title, parsed.data.sections),
       };
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("A geração demorou mais que o esperado. Tente novamente.");
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+
+        // Erros comuns de limite da API.
+        if (
+          message.includes("429") ||
+          message.includes("rate limit") ||
+          message.includes("resource exhausted")
+        ) {
+          throw new Error("Muitas solicitações. Tente novamente em instantes.");
+        }
+
+        // Erros de autenticação/chave.
+        if (
+          message.includes("401") ||
+          message.includes("403") ||
+          message.includes("api key") ||
+          message.includes("authentication")
+        ) {
+          throw new Error("Não foi possível autenticar o serviço de IA.");
+        }
+
+        throw error;
       }
-      throw error instanceof Error ? error : new Error("Falha inesperada na geração.");
-    } finally {
-      clearTimeout(timeout);
+
+      throw new Error("Falha inesperada na geração.");
     }
   });
