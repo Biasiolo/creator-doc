@@ -14,7 +14,7 @@ export function GeneratingOverlay() {
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((i) => Math.min(i + 1, messages.length - 1));
-    }, 3500);
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
